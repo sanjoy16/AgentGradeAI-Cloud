@@ -6,7 +6,7 @@ import streamlit as st
 
 from engine import evaluate, pdf_report
 from reports import normalize_result
-from verification import PROFILES, tool_health
+from verification import PROFILES, tool_health, main_io_model
 from student_report import deductions
 from storage import (
     initialize, submit, get_submission, pending_submissions, approve, approved_payload,
@@ -28,6 +28,11 @@ def show_analysis(result, source, title):
         st.warning(correction)
     if result.get("review_required"):
         st.warning("Inspect incomplete, unavailable or violated checks before approving marks.")
+    if any(d.get("status") == "BLOCKED" and "only literal scanf" in d.get("result", "")
+           for d in result.get("agent_details", [])):
+        st.info("This stored assessment used the older single-integer input adapter. "
+                "The upgraded adapter supports bounded strings and multiple integer conversions. "
+                "Submit a new assessment to collect new tool evidence; downloading this report does not rerun it.")
     st.subheader("Rubric breakdown")
     st.table([{
         "Criterion": r["criterion"], "Status": r["status"],
@@ -82,7 +87,9 @@ with student:
         profile = st.selectbox("Trusted assignment profile", list(PROFILES),
                                format_func=lambda key: PROFILES[key])
         st.caption("Function profiles require the exact function signature shown. For a main-only program select Open C safety. "
-                   "Safety mode does not compare output to the assignment's expected answer.")
+                   "Safety mode does not compare output to the assignment's expected answer. "
+                   "Literal scanf formats support %d and bounded %Ns strings, including whitespace-separated conversions. "
+                   "Run bash run-mac.command on the Mac for the integrated tools; use localhost:8502.")
         uploaded = st.file_uploader("Upload C program (.c)", type=["c"])
         send = st.form_submit_button("Submit for evaluation")
     if send:
@@ -92,6 +99,10 @@ with student:
             st.error("Maximum upload size is 100 KB.")
         else:
             source = uploaded.getvalue().decode("utf-8", errors="replace")
+            if profile == "main" and main_io_model(source) == "unsupported":
+                st.warning("This input format needs a trusted harness. LLVM can still be generated, "
+                           "but input-dependent verification will be blocked. Supported formats: "
+                           "literal %d and width-limited %Ns strings (width <=256), separated by whitespace.")
             with st.spinner("Running the tool pipeline; the sequential checks can take several minutes"):
                 result = evaluate(source, title, profile)
             sid = submit(DB, name.strip(), roll.strip(), title.strip(), source, result)

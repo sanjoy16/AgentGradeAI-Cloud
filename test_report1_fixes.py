@@ -30,7 +30,7 @@ class ReportCorrections(unittest.TestCase):
             self.assertIn("*target = value", code)
         self.assertEqual(main_io_model('scanf("%f",&x);'), "unsupported")
         self.assertEqual(main_io_model('scanf(format,&x);'), "unsupported")
-        self.assertEqual(main_io_model('scanf("%d %d",&x,&y);'), "unsupported")
+        self.assertEqual(main_io_model('scanf("%d %d",&x,&y);'), "integer_tokens")
 
     def test_bound_and_unsigned_notes(self):
         self.assertGreaterEqual(UNWIND_BOUND, 21)

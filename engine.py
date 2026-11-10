@@ -65,7 +65,7 @@ def _evaluate_static(source, title):
 def evaluate(source, title, profile="main"):
     from time import perf_counter
     from reports import normalize_result
-    from verification import execute, stage, PROFILES
+    from verification import execute, stage, PROFILES, input_scope
     from knowledge import enrich
     start = perf_counter()
     result = _evaluate_static(source, title)
@@ -133,10 +133,8 @@ def evaluate(source, title, profile="main"):
     result["assessment_mode"] = (
         "GCC/Cp pcheck static analysis; Docker Clang/LLVM and KLEE; native Z3 query replay and CBMC; "
         "local knowledge graph and graph-guided lexical retrieval. Profile: " + PROFILES[profile]).replace("Cp pcheck", "Cppcheck")
-    if artifacts.get("input_model") == "integer_tokens":
-        result["assessment_mode"] += (
-            ". Single %d scanf calls use a signed-integer token model with success, matching failure and EOF; "
-            "printf output is abstracted. Text parsing and expected output are not verified")
+    if artifacts.get("input_model") in ("integer_tokens", "bounded_tokens", "unsupported"):
+        result["assessment_mode"] += ". " + input_scope(artifacts["input_model"])
     result["report_schema_version"] = 4
     result["review_required"] = any(
         d["status"] in ("UNAVAILABLE", "BLOCKED", "VIOLATED", "INCONCLUSIVE", "REVIEW REQUIRED", "FAILED / REVIEW")

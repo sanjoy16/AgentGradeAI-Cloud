@@ -41,13 +41,19 @@ heuristic scores before approval. A missing or incomplete check is not a pass.
 
 ## Existing main-only programs
 
-Choose Open C program - safety checks on main. Literal single-integer scanf("%d", &int) calls use an explicit token model:
-success writes a symbolic signed integer, while matching failure and EOF leave
-the destination unchanged. Printf output is abstracted and its return value is
-nondeterministic. Text parsing and formatted-output safety are outside this model.
-Other scanf formats require an instructor-authored model and are blocked.
-Programs without scanf retain the symbolic-byte stdin mode.
-CBMC checks enabled safety properties with loop unwinding bound 32. These checks do not infer the assignment's expected
+Choose Open C program - safety checks on main. Literal scanf formats now support
+%d and bounded %Ns strings (width 1..256), with up to eight whitespace-separated
+conversions per call. Success and partial assignment counts write the corresponding
+destinations; matching failure and EOF leave unsuccessful destinations unchanged.
+Strings contain non-NUL, non-whitespace bytes followed by a NUL terminator.
+This is a token-level abstraction: independent calls do not model persistent stream
+state, exact text parsing or locale. Printf output is abstracted. Confirm findings
+with concrete replay or faculty review; completion is not universal correctness.
+Other scanf formats remain blocked for symbolic execution and CBMC, but they no
+longer prevent LLVM generation. Programs without scanf retain symbolic-byte stdin.
+CBMC keeps unwinding assertions enabled. Its bound is at least 32 and expands to
+one beyond the largest modelled string width (64 for %63s).
+These checks do not infer the assignment's expected
 output, so this mode does not automatically award functional correctness points.
 A main-only factorial program is different from int factorial(int n).
 To use the factorial contract, submit the named function shown in examples.
@@ -106,8 +112,8 @@ Real KLEE and CBMC runs and Apple Silicon emulation must be validated on your Ma
 
 - A clean KLEE path count cannot establish coverage when an input function was
   unresolved or executed externally. Such retained logs are now INCONCLUSIVE.
-- New main-mode runs with literal single-integer scanf calls use the explicit
-  token-level model documented above. Other input formats are not silently modelled.
+- New main-mode runs use the supported literal token formats documented above.
+  Unsupported input formats are not silently modelled.
 - CBMC's default unwind bound is now 32, sufficient for the supplied guarded
   factorial loop up to 20, while all unwinding assertions remain enabled.
   Larger or nested loops can still require a different bound and review.
@@ -156,3 +162,8 @@ Validation covers the ten-page count, all 14 agent names, retained marks,
 line-specific advice, deduction totals, long fields, moderation reasons,
 recorded-input matching and suggested tests. Optional environment-dependent
 checks can be skipped when their dependencies are absent.
+
+## Bounded input adapter upgrade
+
+See INPUT_MODEL_UPGRADE.md for the reason four stages were blocked, the newly
+supported formats, deployment requirements and steps to generate fresh evidence.
