@@ -18,6 +18,14 @@ IMAGE = "klee/klee:3.0"
 TIMEOUT = 60
 UNWIND_BOUND = 32
 
+# CPROVER intrinsics remain declarations, never no-op implementations.
+# These C99 prototypes also permit strict GCC/Clang syntax checking.
+CBMC_DECLARATIONS = (
+    "extern int gradeai_nondet_int(void);\n"
+    "extern void __CPROVER_assume(_Bool assumption);\n"
+    "extern void __CPROVER_assert(_Bool assertion, const char *description);\n"
+)
+
 
 def command(args, cwd=None, timeout=TIMEOUT):
     """Record genuine tool termination separately from a property verdict."""
@@ -67,7 +75,7 @@ def harness(profile, backend, source=""):
             choice = lambda name: f'klee_make_symbolic(&{name}, sizeof({name}), "{name}");'
             assumption = "klee_assume(status >= -1); klee_assume(status <= 1);"
         else:
-            declarations = "extern int gradeai_nondet_int(void);\n"
+            declarations = CBMC_DECLARATIONS
             choice = lambda name: f"{name} = gradeai_nondet_int();"
             assumption = "__CPROVER_assume(status >= -1); __CPROVER_assume(status <= 1);"
         return declarations + """#include <stdio.h>
@@ -111,7 +119,7 @@ int gradeai_printf(const char *format, ...)
         assume = lambda s: f"klee_assume({s});"
         check = lambda s: f"klee_assert({s});"
     else:
-        declarations = 'extern int gradeai_nondet_int(void);\n'
+        declarations = CBMC_DECLARATIONS
         symbol = lambda n: f"{n} = gradeai_nondet_int();"
         assume = lambda s: f"__CPROVER_assume({s});"
         check = lambda s: f'__CPROVER_assert({s}, "assignment function contract");'

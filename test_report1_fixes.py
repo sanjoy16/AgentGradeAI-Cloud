@@ -64,12 +64,23 @@ class ReportCorrections(unittest.TestCase):
             header.mkdir()
             (header / "klee.h").write_text(
                 "#include <stddef.h>\nvoid klee_make_symbolic(void *,size_t,const char *);\n"
-                "void klee_assume(unsigned long);\n")
-            for backend in ("klee", "cbmc"):
-                (root / "harness.c").write_text(harness("main", backend, SOURCE))
-                run = subprocess.run([compiler, "-fsyntax-only", "-I", folder, str(root / "harness.c")],
-                                     capture_output=True, text=True)
-                self.assertEqual(run.returncode, 0, run.stderr)
+                "void klee_assume(unsigned long);\nvoid klee_assert(int);\n")
+            cases = {
+                "main": SOURCE,
+                "factorial": "int factorial(int n) { int r=1; for(int i=1;i<=n;i++) r*=i; return r; }",
+                "maximum": "int maximum(int a,int b) { return a>b?a:b; }",
+            }
+            for profile, source in cases.items():
+                (root / "submission.c").write_text(source)
+                for backend in ("klee", "cbmc"):
+                    with self.subTest(profile=profile, backend=backend):
+                        (root / "harness.c").write_text(harness(profile, backend, source))
+                        run = subprocess.run(
+                            [compiler, "-std=c11", "-Werror=implicit-function-declaration",
+                             "-fsyntax-only", "-I", folder, str(root / "harness.c")],
+                            capture_output=True, text=True)
+                        self.assertEqual(run.returncode, 0, run.stderr)
+            (root / "submission.c").write_text(SOURCE)
             exe = root / "example"
             subprocess.run([compiler, str(root / "submission.c"), "-o", str(exe)], check=True)
             for value, expected in [("0\n", "Factorial of 0 = 1"),
