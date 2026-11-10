@@ -1,0 +1,37 @@
+[
+  {
+    "id": "integer-range",
+    "concept": "integer_range",
+    "title": "Integer range and factorial",
+    "text": "A signed 32-bit int represents -2147483648 to 2147483647. Factorial fits for inputs 0 through 12. Define the input contract and check larger inputs explicitly. A signed overflow finding is different from a wrong-output finding.",
+    "source": "Bundled course notes / integer-range"
+  },
+  {
+    "id": "function-contract",
+    "concept": "functional_contract",
+    "title": "Preconditions and postconditions",
+    "text": "A function contract identifies valid inputs and the required result. Check equal and boundary values. For a maximum function, equal arguments must return that same value. For factorial, zero factorial equals one.",
+    "source": "Bundled course notes / function-contract"
+  },
+  {
+    "id": "safe-input",
+    "concept": "input_validation",
+    "title": "Checking C input",
+    "text": "Check the return value of scanf before using a variable. Define array-size limits before allocation. Invalid or absent input may terminate main before the intended algorithm executes.",
+    "source": "Bundled course notes / safe-input"
+  },
+  {
+    "id": "verification-scope",
+    "concept": "verification_limits",
+    "title": "Understanding verification limits",
+    "text": "A KLEE timeout is inconclusive. A CBMC unwinding failure indicates that the selected bound was insufficient for that claim. SAT on a KLEE path query shows query satisfiability and is not by itself a program failure.",
+    "source": "Bundled course notes / verification-scope"
+  },
+  {
+    "id": "unsigned-factorial-range",
+    "concept": "unsigned_integer_range",
+    "title": "Unsigned 64-bit range and factorial",
+    "text": "For a 64-bit unsigned long long, values range from 0 to 18446744073709551615. 20! equals 2432902008176640000 and fits; 21! exceeds this range. A guarded input domain of 0 through 20 is appropriate for this representation. The signed 32-bit limit of 12! applies to an int factorial, not this unsigned 64-bit accumulator.",
+    "source": "Bundled course notes / unsigned-factorial-range"
+  }
+]
