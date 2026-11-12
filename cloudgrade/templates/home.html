@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% block content %}
+<section class="hero"><div><p class="eyebrow">A BETTER WAY TO ASSESS C PROGRAMMING</p><h1>Every line reviewed.<br>Every student<br><em>moving forward.</em></h1><p class="lede">Submit your C assignments from anywhere. Get clear, evidence-based feedback from specialized evaluation agents, reviewed by your faculty.</p><div class="actions"><a class="button" href="{{ url_for('web.register') }}">Start your submission ↗</a><a class="button secondary" href="{{ url_for('web.login') }}">Faculty sign in →</a></div><p class="muted">Browser-based submission · Secure cloud execution · Human oversight</p></div><div class="workflow-art"><div class="code-card"><div class="window"><i></i><i></i><i></i><span>assignment.c</span></div><pre><span class="syntax">#include</span> &lt;stdio.h&gt;
+
+<span class="syntax">int</span> main(void) {
+    int a, b;
+    if (scanf("%d %d", &amp;a, &amp;b) != 2)
+        return 1;
+    printf("%d\n", a + b);
+    return 0;
+}</pre></div><div class="agent-flow"><span>01 &nbsp; SUBMIT</span><b>→</b><span>02 &nbsp; ANALYZE</span><b>→</b><span>03 &nbsp; REVIEW</span></div><div class="review-note"><span class="check">✓</span><div><strong>Faculty approval comes first</strong><p>Your assessment stays confidential until reviewed.</p></div></div></div></section>
+<section class="feature-row"><article><span class="number">01 /</span><h3>One upload. Multiple perspectives.</h3><p>Compilation, functionality, code quality, complexity, optimization, security and verification.</p></article><article><span class="number">02 /</span><h3>Understand your marks.</h3><p>See the rubric, evidence and recommendations behind each part of your faculty-approved score.</p></article><article><span class="number">03 /</span><h3>Feedback you can build on.</h3><p>Track your submissions and download a detailed PDF report when your results are published.</p></article></section>
+{% endblock %}

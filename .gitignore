@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.db
+.env
+instance/
+*.pdf
+*.dump
+*.log
+backups/
+.env.*
+!.env.example

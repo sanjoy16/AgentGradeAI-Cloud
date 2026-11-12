@@ -1,0 +1,11 @@
+# AMD64 CBMC; build the base sandbox image first.
+FROM agentgrade-sandbox:1
+USER root
+RUN --mount=type=secret,id=proxy_ca \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    if [ -f /run/secrets/proxy_ca ]; then export CURL_CA_BUNDLE=/run/secrets/proxy_ca; fi; \
+    curl -fL --retry 3 https://github.com/diffblue/cbmc/releases/download/cbmc-6.11.0/ubuntu-22.04-cbmc-6.11.0-Linux.deb -o /tmp/cbmc.deb && \
+    echo 'de9fa1cc4cf51c493e708a1c7608b192ad4956717b684d9c4501e22fd22d88a0  /tmp/cbmc.deb' | sha256sum -c - && \
+    apt-get install -y --no-install-recommends /tmp/cbmc.deb && \
+    rm -rf /tmp/cbmc.deb /var/lib/apt/lists/*
+USER 65534:65534
