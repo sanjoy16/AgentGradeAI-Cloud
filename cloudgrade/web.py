@@ -154,7 +154,7 @@ def submit():
 def detail(sid):
     item = submission_or_404(sid)
     # Report confidentiality is enforced here, not merely by hiding UI controls.
-    report = item.report if g.user.role == 'faculty' else item.approved_report if item.status == 'approved' else None
+    report = item.approved_report if item.status == 'approved' else item.report if g.user.role == 'faculty' else None
     audit = db.session.scalars(select(Audit).where(Audit.submission_id == sid).order_by(Audit.created_at)).all() if g.user.role == 'faculty' else []
     return render_template('detail.html', item=item, report=report, audit=audit)
 

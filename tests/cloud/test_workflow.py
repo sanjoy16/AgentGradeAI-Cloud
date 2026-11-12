@@ -42,6 +42,7 @@ def test_complete_approval_flow_and_confidentiality(app, client):
     item = db.session.get(Submission, sid)
     assert item.status == 'approved'
     assert item.approved_by == 3
+    assert b'Faculty-approved assessment' in client.get(path).data
     assert item.approved_report['score'] == sum(a['score'] for a in item.approved_report['agents'])
     assert db.session.scalar(select(Audit).where(Audit.action == 'approved')).detail['changes']
     # Immutable publication: subsequent approvals and retries are rejected.
