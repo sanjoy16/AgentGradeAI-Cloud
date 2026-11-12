@@ -1,0 +1,9 @@
+# Optional KLEE toolchain. Match clang to the LLVM version used by this image.
+FROM klee/klee:3.0
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3 gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+COPY --chmod=0444 sandbox/runner.py /opt/runner.py
+ENV PATH="/home/klee/klee_build/bin:/home/klee/klee_install/bin:/usr/local/bin:/usr/bin:/bin"
+USER 65534:65534
+WORKDIR /work
+ENTRYPOINT ["python3", "-I", "/opt/runner.py"]

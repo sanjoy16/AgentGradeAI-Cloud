@@ -1,169 +1,86 @@
-# GradeAI integrated local tool runner
+# AgentGradeAI-Cloud
 
-The previous report-only package hardcoded unavailable stage records.
-This revision implements LLVM/KLEE Docker adapters, Z3 query replay, native CBMC,
-an evidence graph, graph-guided course retrieval and SQLite learning-history summaries.
-It preserves faculty approval and the detailed PDF report.
+Python cloud application for C programming assessment: student accounts, isolated execution, independent specialist evaluation agents, configurable grading, faculty approval and downloadable PDF reports.
 
-## Run the full pipeline on your Mac
+The cloud application is in `cloudgrade/` (Flask, SQLAlchemy, PostgreSQL and a durable database queue). The existing Streamlit research prototype remains in `app.py`; its original instructions are in [README-legacy.md](README-legacy.md). The root Dockerfile still builds that prototype. Use `deployment/Dockerfile` for the cloud platform. The cloud database is separate and does not migrate legacy records.
 
-1. Install and open Docker Desktop. Install Homebrew from https://brew.sh if needed.
-2. Extract this ZIP into a NEW folder.
-3. If retaining your old app records, follow MIGRATE_MAC.md before native launch.
-4. Open Terminal in AgentGradeAI-Cloud and run:
+## Features
 
-    bash run-mac.command
+- Public student registration, personal details, assignment title/notes and UTF-8 C upload (64 KB maximum).
+- CLI-provisioned faculty accounts; public registration cannot grant faculty privileges.
+- Faculty-authored assignments, hidden tests, configurable rubric and optional function-contract harness.
+- Persistent queue, atomic job claims, attempt tokens, interrupted-job detection and faculty retry.
+- GCC compilation, UBSan functional tests, Cppcheck, Clang security analysis, explicit style heuristics, optional CBMC/KLEE adapters and independent AI specialty commentary.
+- Draft confidentiality enforced server-side. Faculty resolves every mark, adds feedback/rationale and approves publication atomically.
+- Student access to own approved results/PDF only; immutable published snapshots, original evidence and audit trail.
+- Responsive student/faculty dashboards, HTTPS deployment, CSRF protection, password hashing and request throttling.
 
-The launcher installs native CBMC, Z3, Cppcheck and Python 3.12 with Homebrew,
-creates .venv, installs the Python requirements, pulls klee/klee:3.0, asks for a
-faculty password and starts the app at http://localhost:8502.
-Apple Silicon uses linux/amd64 emulation for the KLEE worker. The app runs on
-the Mac host so Homebrew tools and Docker are accessible.
-This is a local assessment prototype, not a public multi-user deployment.
+## Deploy on a cloud Linux server
 
-## Verify a complete function-contract run
+Students need only a browser. The server needs Docker Engine, Compose, gVisor `runsc`, a real public domain and at least 4 vCPUs, 8 GB RAM and 40 GB disk.
 
-Upload examples/factorial.c with profile:
-Function contract - int factorial(int n), n = 0..12.
+```bash
+cp .env.example .env
+# Fill with independent random secrets and your domain; never commit .env.
+docker build -f sandbox/Dockerfile -t agentgrade-sandbox:1 .
+docker compose build
+docker compose up -d db redis
+docker compose run --rm web flask --app cloudgrade init-db
+docker compose run --rm web flask --app cloudgrade create-faculty
+docker compose run --rm web flask --app cloudgrade seed-assignment
+docker compose up -d
+```
 
-Give it an assignment title and submit. In Faculty review, open the tool
-availability panel and check all dependencies. Examine each real stage log.
+Point DNS at the VM and allow 80/443. Caddy obtains HTTPS certificates. Visit `https://YOUR_DOMAIN`, register a student and submit `examples/cloud/sum.c`. Sign in separately as faculty to review and publish. No default credentials are supplied.
 
-Then submit examples/maximum_bug.c with the maximum profile. The symbolic
-and formal verification stages should expose a contract violation. Upload
-examples/maximum_correct.c with the same profile to compare.
+See [deployment](deployment/DEPLOYMENT.md), [architecture](deployment/ARCHITECTURE.md), [verification](deployment/VERIFICATION.md) and [validation](deployment/VALIDATION.md).
 
-Tool installation enables execution. A completed stage can find a defect.
-UNAVAILABLE means a dependency cannot be found. BLOCKED means its prerequisite
-failed. INCONCLUSIVE indicates incomplete analysis or a tool error. A verified
-bounded function contract can contribute 15 rubric points; review all other
-heuristic scores before approval. A missing or incomplete check is not a pass.
+## Transparent scoring
 
-## Existing main-only programs
+| Agent | Default points | Method / limitation |
+|---|---:|---|
+| Compilation | 15 | GCC C17, Wall/Wextra/Wpedantic |
+| Functionality | 30 | Faculty stdin tests; UBSan; trimmed exact output |
+| Quality | 15 | Explicit structural/style heuristics |
+| Complexity | 10 | Token observations; faculty must judge actual complexity |
+| Optimization | 10 | Cppcheck diagnostics; no benchmark claim |
+| Security | 10 | Clang analyzer and unsafe API patterns; no security proof |
+| Best practices | 5 | Explicit heuristic checks |
+| Formal verification | 3 | Optional CBMC, trusted bounded harness |
+| Symbolic execution | 2 | Optional KLEE; coverage needs faculty interpretation |
 
-Choose Open C program - safety checks on main. Literal scanf formats now support
-%d and bounded %Ns strings (width 1..256), with up to eight whitespace-separated
-conversions per call. Success and partial assignment counts write the corresponding
-destinations; matching failure and EOF leave unsuccessful destinations unchanged.
-Strings contain non-NUL, non-whitespace bytes followed by a NUL terminator.
-This is a token-level abstraction: independent calls do not model persistent stream
-state, exact text parsing or locale. Printf output is abstracted. Confirm findings
-with concrete replay or faculty review; completion is not universal correctness.
-Other scanf formats remain blocked for symbolic execution and CBMC, but they no
-longer prevent LLVM generation. Programs without scanf retain symbolic-byte stdin.
-CBMC keeps unwinding assertions enabled. Its bound is at least 32 and expands to
-one beyond the largest modelled string width (64 for %63s).
-These checks do not infer the assignment's expected
-output, so this mode does not automatically award functional correctness points.
-A main-only factorial program is different from int factorial(int n).
-To use the factorial contract, submit the named function shown in examples.
-Other assignments need instructor-authored harnesses and input domains.
+Each assignment's integer weights must total 100. The final score is the sum of agent marks, each bounded by its weight. Missing checks have null provisional marks; their points are unawarded, never redistributed. Faculty explicitly enters every score, including zero when credit is unsupported. Tests and rubric are snapshotted on submission. Override rationale and original marks are preserved.
 
-## What each newly integrated stage does
+## AI agents
 
-- LLVM generates actual bitcode and textual IR using Clang inside the KLEE image.
-  It counts IR definitions and branch instructions. Full CFG/def-use graphs are
-  not implemented.
-- KLEE runs the selected symbolic harness and preserves errors and test inputs.
-- Z3 replays up to 12 SMT-LIB query artifacts generated by that KLEE run.
-  SAT here is query satisfiability, not automatically a code defect.
-- CBMC runs the trusted C harness with a bound of 32 and unwinding assertions.
-- Knowledge Graph creates typed evidence and concept relationships as JSON.
-- GraphRAG traverses those concept links and lexically ranks local course notes.
-  This is a small graph-guided retriever, without embeddings or an external LLM.
-- Learning Analytics queries matching prior attempts and approved scores in SQLite.
-  It records counts and historical concepts, without claiming measured learning gains.
+Configure `OPENAI_API_KEY` in the worker's protected environment to enable separate model calls for each specialty. `OPENAI_MODEL` is configurable. Calls receive agent summaries, not raw source, hidden tests or identity. Model commentary cannot change scores, execute commands or approve results. Without a key the tool-assisted pipeline works and reports AI agents as disabled. No AI credential was supplied in this session.
 
-Native tool checks and KLEE outputs, including IR, logs, queries, graph and
-retrieved notes, are retained inside the submission's result JSON in SQLite.
-Per-agent diagnostics appear in faculty review and approved PDF. Program source
-is never compiled into a native executable and run by the app.
+## Development
 
-The original static design/complexity/optimization heuristics remain provisional.
-Semantic review and feedback are rule-based. No LLM, RL scheduler or LangGraph
-has been added by this revision. The fixed Python coordinator runs real adapters.
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-cloud.txt
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export COOKIE_SECURE=false  # localhost HTTP only
+.venv/bin/flask --app cloudgrade init-db
+.venv/bin/flask --app cloudgrade create-faculty
+.venv/bin/flask --app cloudgrade seed-assignment
+.venv/bin/flask --app cloudgrade run --port 8000
+# Another shell with identical environment:
+.venv/bin/python -m cloudgrade.worker
+```
 
-## Updates and persistence
+SQLite is for development; production uses PostgreSQL and Redis. Worker and web must share the database and session configuration.
 
-The native app uses data/agentgrade.db. The Docker app volume is separate.
-Use the documented migration once to import a consistent snapshot.
-Old assessments preserve historical results. Resubmit to run the new adapters.
-Approvals never silently rerun or rewrite an existing assessment.
+```bash
+python -m pytest tests/cloud -q
+RUN_SANDBOX_TESTS=1 TEST_SANDBOX_RUNTIME=runsc python -m pytest tests/cloud -q
+```
 
-The included Dockerfile remains a static-report fallback. It does not make
-Homebrew binaries or the Docker daemon available inside that container.
-Use run-mac.command for the integrated pipeline described here.
+CI additionally tests Docker isolation using its default runtime; this test setting does not change production's gVisor requirement.
 
-## Tests and current validation
+## Deployment status and remaining integrations
 
-    python -m unittest -v
+**No persistent public deployment has been provisioned.** GitHub is connected, but this session has no cloud-hosting account, domain or production secrets. Available Sites hosting cannot run this Python service or native C workers; a static substitute is not presented as the assessment portal.
 
-Test cases include the original report/approval regression checks, contract
-harness generation, outcome classification, graph retrieval, history updates,
-missing-tool behaviour, mocked worker-output parsing, real Z3 query execution,
-and Streamlit faculty/result views when the optional test dependencies are present.
-Install pypdf for PDF-content checks.
-
-The distribution includes adapters, not preinstalled KLEE or CBMC binaries.
-Real KLEE and CBMC runs and Apple Silicon emulation must be validated on your Mac.
-
-
-## Corrections after REPORT1 review
-
-- A clean KLEE path count cannot establish coverage when an input function was
-  unresolved or executed externally. Such retained logs are now INCONCLUSIVE.
-- New main-mode runs use the supported literal token formats documented above.
-  Unsupported input formats are not silently modelled.
-- CBMC's default unwind bound is now 32, sufficient for the supplied guarded
-  factorial loop up to 20, while all unwinding assertions remain enabled.
-  Larger or nested loops can still require a different bound and review.
-- Retrieved guidance distinguishes signed-int factorial (0..12) from the
-  unsigned-64-bit accumulator in REPORT1 (0..20).
-- Existing approved records retain their marks and timestamps. Re-exporting an
-  old report adds interpretation corrections from retained diagnostics. It does
-  not rerun tools, invent new results or replace the original stored evidence.
-- New PDF excerpts prioritize failed properties and completion summaries.
-  The evidence appendix references each producing stage rather than duplicating
-  every raw log.
-- examples/factorial_main_ull.c fixes the main(void) prototype and formats the
-  supplied algorithm for a new assessment. The original submitted source is retained.
-
-
-## Ten-page student PDF update
-
-Every approved download now has exactly ten pages:
-1. Assessment overview, approved and provisional marks, and priorities.
-2. Unawarded marks, relevant program locations, and deduction reasons.
-3. Repair examples and practical revision guidance.
-4. Coordinator, scheduler, compilation and LLVM analysis.
-5. Symbolic execution, SMT, formal verification and security analysis.
-6. Semantic, knowledge graph and retrieval analysis.
-7. Evaluation, feedback and learning analytics.
-8. Suggested tests, recorded coverage and available input examples.
-9. Submitted source review map with original line numbers.
-10. Evidence references, learning resources and next steps.
-
-Each agent summary includes purpose, inputs, analysis, outputs, status and evidence.
-Advice distinguishes confirmed findings, heuristic decisions, withheld credit and
-incomplete checks. Suggested tests are explicitly labelled as not executed.
-Algorithm guidance does not claim that loop counts establish inefficiency.
-
-Full logs and source remain in faculty review. Long fields are summarized to keep
-the report at ten pages; source longer than the review map uses relevant excerpts.
-Existing scoring rules, historical marks and approval timestamps are preserved.
-Faculty adjustments require a recorded reason.
-
-Stop the native app with Control-C, extract this ZIP over the existing project,
-then run bash run-mac.command in AgentGradeAI-Cloud. Existing data/agentgrade.db
-and .venv are not included in this archive. Download an approved report again to
-use the new layout without rerunning analysis. New tool outcomes require a new run.
-
-Validation covers the ten-page count, all 14 agent names, retained marks,
-line-specific advice, deduction totals, long fields, moderation reasons,
-recorded-input matching and suggested tests. Optional environment-dependent
-checks can be skipped when their dependencies are absent.
-
-## Bounded input adapter upgrade
-
-See INPUT_MODEL_UPGRADE.md for the reason four stages were blocked, the newly
-supported formats, deployment requirements and steps to generate fresh evidence.
+The default sandbox includes GCC, Cppcheck and Clang. Optional CBMC/KLEE images require separate setup and verification. Missing tools are never reported as successful checks. General correctness cannot be inferred without a specification. Email verification, password-reset delivery, institutional SSO/MFA, multi-file uploads, LMS integration, schema migrations beyond initialization and institution-specific retention automation remain enhancements.

@@ -1,0 +1,69 @@
+name: agentgradeai
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: agentgrade
+      POSTGRES_USER: agentgrade
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a database password}
+    volumes: ["db-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentgrade"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+      target: web
+    environment: &app-env
+      DATABASE_URL: postgresql+psycopg://agentgrade:${POSTGRES_PASSWORD}@db/agentgrade
+      SECRET_KEY: ${SECRET_KEY:?Set a random session secret}
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "true"
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+      target: worker
+    environment:
+      <<: *app-env
+      SANDBOX_RUNTIME: runsc
+      SANDBOX_IMAGE: agentgrade-sandbox:1
+      SANDBOX_FORMAL_IMAGE: ${SANDBOX_FORMAL_IMAGE:-agentgrade-sandbox:1}
+      SANDBOX_SYMBOLIC_IMAGE: ${SANDBOX_SYMBOLIC_IMAGE:-agentgrade-sandbox:1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+  proxy:
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:?Set your public domain}
+    volumes:
+      - ./deployment/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web]
+    restart: unless-stopped
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

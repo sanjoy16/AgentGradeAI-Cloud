@@ -1,0 +1,16 @@
+name: Cloud platform tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-cloud.txt
+      - run: python -m pytest tests/cloud -q
+      - run: docker build -f sandbox/Dockerfile -t agentgrade-sandbox:1 .
+      - run: RUN_SANDBOX_TESTS=1 python -m pytest tests/cloud/test_sandbox.py -q
