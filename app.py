@@ -6,7 +6,7 @@ import streamlit as st
 
 from engine import evaluate, pdf_report
 from reports import normalize_result
-from verification import PROFILES, tool_health, main_io_model
+from verification import PROFILES, tool_health, main_io_model, dependency_guidance
 from student_report import deductions
 from storage import (
     initialize, submit, get_submission, pending_submissions, approve, approved_payload,
@@ -151,7 +151,10 @@ with faculty:
         if password and hmac.compare_digest(password, FACULTY_PASSWORD):
             with st.expander("Tool availability on the application host"):
                 if st.button("Check installed tools"):
-                    st.json(tool_health())
+                    health = tool_health()
+                    st.json(health)
+                    for guidance in dependency_guidance(health):
+                        st.info(guidance)
                 st.caption("Use run-mac.command for real KLEE/LLVM, Z3 and CBMC. An older Docker-only app may not have access to these tools.")
             pending = pending_submissions(DB)
             st.write(f"Pending submissions: {len(pending)}")

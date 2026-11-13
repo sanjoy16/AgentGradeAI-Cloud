@@ -102,6 +102,7 @@ int main(void) {
         self.assertTrue(all(x['status']=='COMPLETED' for x in records.values()))
         cbmc=next(x for x in commands if x[0]=='cbmc')
         self.assertEqual(cbmc[cbmc.index('--unwind')+1],'64')
+        self.assertIn('--unsigned-overflow-check', cbmc)
         self.assertIn('stream persistence',records['verification']['outputs'][-1])
 
     def test_unsupported_input_does_not_disable_llvm(self):
