@@ -58,6 +58,24 @@ def tool_health():
     return health
 
 
+def dependency_guidance(health=None):
+    """Diagnose the process running the app, not the user's separate terminal."""
+    health = tool_health() if health is None else health
+    advice = []
+    if Path('/.dockerenv').exists():
+        advice.append("This app runs inside a container. Host Homebrew tools are not available here. "
+                      "For the full Mac pipeline, stop this app and run bash run-mac.command from the project folder on macOS; open the URL it prints.")
+    missing = [name for name in ('gcc', 'cppcheck', 'cbmc', 'z3', 'docker') if not health.get(name)]
+    if missing:
+        advice.append('Missing from application PATH: ' + ', '.join(missing) + '. On macOS use bash run-mac.command to install/check dependencies.')
+    if health.get('docker') and not health.get('docker_engine'):
+        advice.append('Docker CLI exists but the engine is unreachable. Open Docker Desktop and wait for the engine, then retry.')
+    elif health.get('docker_engine') and not health.get('klee_image'):
+        advice.append('Pull the worker: docker pull --platform linux/amd64 ' + IMAGE)
+    advice.append('After repairing dependencies, submit a new assessment. Stored and approved reports are snapshots and are not rerun automatically.')
+    return advice
+
+
 def scanf_formats(source):
     """Read literal scanf formats, ignoring comments and unrelated strings."""
     pattern = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|/\*.*?\*/|//[^\n]*|\bscanf\s*\('
@@ -253,7 +271,7 @@ def execute(source, profile):
         artifacts["klee_harness.c"] = read_text(inputs / "klee_harness.c")
         artifacts["cbmc_harness.c"] = read_text(inputs / "cbmc_harness.c")
         if not shutil.which("docker"):
-            records["llvm"] = stage("llvm", "UNAVAILABLE", "Docker CLI is missing. Run the Mac installer.")
+            records["llvm"] = stage("llvm", "UNAVAILABLE", "Docker CLI is missing from the application PATH. On macOS run bash run-mac.command from the project folder. Tools installed on the Mac are not visible inside the web-app container.")
             records["symbolic"] = stage("symbolic", "BLOCKED", "The Docker KLEE worker is unavailable.")
         else:
             name = "gradeai-klee-" + uuid.uuid4().hex[:16]
@@ -360,12 +378,12 @@ done
             unwind_bound = max([UNWIND_BOUND] + [width + 1 for width in string_widths])
             args = ["cbmc", str(inputs / "cbmc_harness.c"), "--function", "main",
                     "--unwind", str(unwind_bound), "--unwinding-assertions", "--signed-overflow-check",
-                    "--bounds-check", "--pointer-check", "--div-by-zero-check", "--trace"]
+                    "--unsigned-overflow-check", "--bounds-check", "--pointer-check", "--div-by-zero-check", "--trace"]
             run = command(args, cwd=str(inputs), timeout=60)
             status, message = classify_cbmc(run)
             records["verification"] = stage("verification", status, message,
                 ["Run CBMC on the original C submission and selected trusted harness.",
-                 "Enable memory bounds, pointer, division and signed-overflow checks.",
+                 "Enable memory bounds, pointer, division, signed- and unsigned-overflow checks. Unsigned wrap is a review finding; C defines wraparound and the assignment contract determines whether it is acceptable.",
                  f"Retain unwinding assertions at bound {unwind_bound}; an exhausted bound requires review."],
                 ["Scope: " + PROFILES[profile], f"Unwind bound: {unwind_bound}; wall-time limit: 60 seconds."],
                 [run["log"]])
