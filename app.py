@@ -23,7 +23,9 @@ st.caption("Detailed agent evidence and faculty-approved PDF reports")
 
 def show_analysis(result, source, title):
     result = normalize_result(result, source, title)
-    st.info(result.get("assessment_mode", "Legacy static assessment. Missing integrations in older records remain not run."))
+    st.caption("Checked profile: " + result.get("assignment_profile", "Legacy assessment"))
+    with st.expander("Checked scope and limitations", expanded=False):
+        st.write(result.get("assessment_mode", "Legacy static assessment. Missing integrations remain not run."))
     for correction in result.get("report_corrections", []):
         st.warning(correction)
     if result.get("review_required"):
@@ -49,31 +51,23 @@ def show_analysis(result, source, title):
         } for item in issues])
     else:
         st.write("No rubric deductions were recorded.")
-    st.subheader("How each agent analysed the code")
-    for number, agent in enumerate(result["agent_details"], 1):
-        with st.container(border=True):
-            st.markdown(f'#### {number:02d} {agent["name"]}')
-            st.write("Execution status:", agent["status"])
-            st.write(agent["purpose"])
-            for label, key in [("Input received", "inputs"), ("What it did", "steps"),
-                               ("Output produced", "outputs"),
-                               ("Improvement suggestions", "improvements")]:
+    from review_report import agent_rows
+    st.subheader("Agent outcomes")
+    st.table(agent_rows(result))
+    with st.expander("Technical evidence and execution details", expanded=False):
+        for agent in result["agent_details"]:
+            st.markdown(f'**{agent["name"]} | {agent["status"]}**')
+            for label, key in [("Inputs", "inputs"), ("Analysis", "steps"), ("Outputs", "outputs")]:
                 if agent.get(key):
-                    st.markdown(f"**{label}**")
-                    for index, value in enumerate(agent[key], 1):
-                        st.write(f"{index}. {value}")
-            st.write("Result:", agent["result"])
-            st.write("Evidence IDs:", ", ".join(agent["evidence_ids"]) or "None")
+                    st.write(label + ":", agent[key])
             for raw in agent.get("raw_evidence", []):
                 st.code(raw, language="text")
-    st.subheader("Evidence log")
-    for evidence in result["evidence_log"]:
-        st.markdown(f'**{evidence["id"]} - {evidence["agent"]}**')
-        st.write(evidence["fact"])
-        if evidence["raw"]:
-            st.code(evidence["raw"], language="text")
-    st.subheader("Submitted source code")
-    st.code(source, language="c", line_numbers=True)
+        for evidence in result["evidence_log"]:
+            st.write(evidence["id"], evidence["fact"])
+            if evidence["raw"]:
+                st.code(evidence["raw"], language="text")
+    with st.expander("Submitted source code", expanded=False):
+        st.code(source, language="c", line_numbers=True)
 
 
 student, results, faculty = st.tabs(
@@ -136,7 +130,7 @@ with results:
             st.write("Faculty comments:", row["faculty_note"] or "No additional comments.")
             st.write("Approval recorded:", result["approved_at"])
             st.download_button(
-                "Download approved 10-page PDF",
+                "Download approved PDF",
                 data=pdf_report(row["name"], row["roll"], row["title"], result),
                 file_name=f'GradeAI_approved_{row["id"]}.pdf',
                 mime="application/pdf",
@@ -169,8 +163,7 @@ with faculty:
                 st.write("Student:", row["name"], "| Roll:", row["roll"])
                 st.write("Assignment:", row["title"])
                 st.write("Submitted:", row["submitted_at"])
-                st.metric("Static provisional marks", f'{result["provisional_score"]}/100')
-                st.warning("Review the selected contract, checked domain, all tool outcomes and provisional marks before approval.")
+                st.metric("Provisional marks", f'{result["provisional_score"]}/100')
                 show_analysis(result, row["source"], row["title"])
                 with st.form(f"approval_{selected}"):
                     score = st.number_input(

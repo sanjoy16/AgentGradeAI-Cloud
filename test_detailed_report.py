@@ -15,8 +15,8 @@ class DetailedReportTests(unittest.TestCase):
         data = pdf_report("Student", "001", title, result)
         reader = PdfReader(BytesIO(data))
         text = "\n".join(page.extract_text() for page in reader.pages)
-        self.assertEqual(len(reader.pages), 10)
-        for phrase in ["How to revise", "Held-Karp", "unverified credit",
+        self.assertLessEqual(len(reader.pages), 7)
+        for phrase in ["How to revise", "Tests to run after revision", "unverified credit",
                        "not been executed", "Minimum round-trip cost 80",
                        "Submitted source and review map"]:
             self.assertIn(phrase, text)

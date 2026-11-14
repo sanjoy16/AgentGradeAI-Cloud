@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev c
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py engine.py reports.py storage.py verification.py knowledge.py course_notes.json student_report.py detailed_report.py ./
+COPY app.py engine.py reports.py storage.py verification.py knowledge.py course_notes.json student_report.py detailed_report.py review_report.py ./
 COPY fonts ./fonts
 RUN useradd -m grader
 USER grader

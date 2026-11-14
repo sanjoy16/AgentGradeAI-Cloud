@@ -177,5 +177,5 @@ def wrap(value, width, font, size):
 
 
 def render_student_pdf(name, roll, title, result):
-    from detailed_report import render_detailed_pdf
-    return render_detailed_pdf(name, roll, title, result)
+    from review_report import render_review_pdf
+    return render_review_pdf(name, roll, title, result)

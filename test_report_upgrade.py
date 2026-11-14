@@ -73,7 +73,7 @@ class ReportUpgradeTests(unittest.TestCase):
             for _, name, _ in PIPELINE:
                 self.assertIn(name, contents)
             self.assertIn("Source SHA-256", contents)
-            self.assertIn("Evaluation feedback and learning history", contents)
+            self.assertIn("How each agent analysed your code", contents)
             self.assertIn("NOT RUN", contents)
 
     def test_score_validation(self):

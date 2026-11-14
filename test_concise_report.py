@@ -42,10 +42,10 @@ class ConciseReportTests(unittest.TestCase):
                    submission_id="CONCISE-TEST")
         return raw
 
-    def test_report_has_ten_pages_and_all_agents(self):
+    def test_report_has_summary_and_all_agents(self):
         result = self.fixture()
         reader = PdfReader(BytesIO(pdf_report("Test Student", "001", "Factorial", result)))
-        self.assertEqual(len(reader.pages), 10)
+        self.assertLessEqual(len(reader.pages), 7)
         text = "\n".join(page.extract_text() for page in reader.pages)
         self.assertIn("74/100", text)
         self.assertIn("Line 3", text)
@@ -63,7 +63,7 @@ class ConciseReportTests(unittest.TestCase):
         self.assertEqual(testing["kind"], "Withheld")
         self.assertIn("contract", testing["where"])
 
-    def test_long_untrusted_fields_and_logs_stay_ten_pages(self):
+    def test_long_fields_are_bounded_and_raw_logs_are_not_printed(self):
         result = self.fixture()
         result["faculty_note"] = "<unsafe> & text " * 2000
         for a in result["agent_details"]:
@@ -71,7 +71,11 @@ class ConciseReportTests(unittest.TestCase):
             a["raw_evidence"] = ["Full log " * 10000]
         result["source"] = SOURCE + "\n/* " + "long comment " * 10000 + " */"
         data = pdf_report("Long Name " * 100, "123" * 100, "Long title " * 1000, result)
-        self.assertEqual(len(PdfReader(BytesIO(data)).pages), 10)
+        reader = PdfReader(BytesIO(data))
+        self.assertLessEqual(len(reader.pages), 8)
+        text = "\n".join(page.extract_text() for page in reader.pages)
+        self.assertNotIn("Full log Full log", text)
+        self.assertIn("excerpt; full evidence in application", text)
 
     def test_moderated_score_requires_reason(self):
         with tempfile.TemporaryDirectory() as folder:
