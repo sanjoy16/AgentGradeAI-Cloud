@@ -4,13 +4,14 @@ import hashlib
 from xml.sax.saxutils import escape
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
 from student_report import FONT, BOLD, deductions
 from detailed_report import proposed_tests, recorded_inputs
+from student_guidance import readable, repair_cards, agent_help
 
 
 def brief(value, limit=700):
-    text = ' '.join(str(value or '').split())
+    text = ' '.join(readable(value).split())
     return text if len(text) <= limit else text[:limit].rstrip() + ' [excerpt; full evidence in application]'
 
 
@@ -48,15 +49,26 @@ def render_review_pdf(name, roll, title, result):
     provisional = result.get('provisional_score',result.get('score',0))
     heading(f'Final score: {approved}/100')
     story.append(p(f'Provisional rubric: {provisional}/100 | Faculty adjustment: {approved-provisional:+}'))
-    story.append(p('Profile: '+str(result.get('assignment_profile','Not retained'))))
-    story.append(p(brief(result.get('assessment_mode','Checked scope not retained.'),1200)))
+    profile=result.get('assignment_profile','main')
+    story.append(p('What was checked: '+('Program safety checks; printed factorial answers were not compared with expected output.' if profile=='main' else 'The selected function contract, within its stated input range.')))
+    story.append(p('How to read this report: a code warning suggests a repair; an incomplete tool check needs review; held marks mean credit has not yet been verified.'))
     if result.get('review_required'):
         story.append(p('Review flag recorded: incomplete checks or findings require interpretation within the checked scope. Faculty approval does not turn incomplete checks into passes.'))
     heading('Rubric breakdown')
     table([['Criterion','Status / basis','Points']] + [[r['criterion'],brief(r.get('status','')+' - '+r.get('analysis',''),350),f"{r['score']}/{r['max']}"] for r in result.get('rubric',[])],[135,306,70])
     heading('Faculty feedback')
     story.append(p(brief(result.get('faculty_note') or 'No additional faculty comments.',1800)))
-    heading('Feedback: where and how to improve')
+    heading('Your improvement plan: what to change first')
+    story.append(p('The examples below are teaching suggestions based on the source and retained warnings. They were not executed by the report generator and do not add new deductions.'))
+    for card in repair_cards(result):
+        block_start=len(story)
+        heading(card['title']+' - '+card['where'])
+        for label,key in [('Why it matters','why'),('What to change','change')]:
+            story.append(p(label+': '+card[key]))
+        for line in card['example'].splitlines(): story.append(p(line))
+        story.append(p('Check your repair: '+card['test']))
+        block=story[block_start:]; del story[block_start:]; story.append(KeepTogether(block))
+    heading('Why marks were lost or held')
     issues = deductions(result)
     if not issues: story.append(p('No rubric deductions were recorded. This does not establish correctness outside the checked scope.'))
     for issue in issues:
@@ -68,15 +80,21 @@ def render_review_pdf(name, roll, title, result):
     heading('How each agent analysed your code')
     story.append(p('Actual status, retained finding and evidence reference for every recorded agent. COMPLETED describes execution, not necessarily a passed property. No confidence percentage or execution claim is inferred.'))
     for a in result.get('agent_details',[]):
+        block_start=len(story)
         heading(a['name']+' | '+a['status'])
-        story.append(p(brief(a.get('result') or 'No result retained.',700)))
+        meaning,action=agent_help(a)
+        story.append(p('What it checked: '+meaning))
+        story.append(p('Recorded finding: '+brief(a.get('result') or 'No result retained.',450)))
+        story.append(p('What you should do: '+action))
         outputs = list(dict.fromkeys(str(x) for x in a.get('outputs',[]) if x))
-        if outputs: story.append(p('Recorded output: '+' | '.join(brief(x,220) for x in outputs[:3])))
+        if a['key'] in ('symbolic','verification') and outputs:
+            story.append(p('Check details: '+' | '.join(brief(x,200) for x in outputs[:3])))
         story.append(p('Evidence: '+(', '.join(a.get('evidence_ids',[])) or 'None')))
+        block=story[block_start:]; del story[block_start:]; story.append(KeepTogether(block))
     heading('Tests to run after revision')
     story.append(p('Suggested tests have not been executed by this report generator. Compare against the assignment contract.'))
     table([['Case','Input','Expected check']] + [list(x) for x in proposed_tests(result.get('source',''),title)],[115,170,226])
-    inputs = recorded_inputs(result)
+    inputs = []  # Harness-internal nondeterministic objects are not student input examples.
     if inputs:
         heading('Retained symbolic inputs')
         for item in inputs[:5]: story.append(p(brief(item,400)))

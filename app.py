@@ -40,7 +40,15 @@ def show_analysis(result, source, title):
         "Criterion": r["criterion"], "Status": r["status"],
         "Evidence": r["evidence_id"], "Points": f'{r["score"]}/{r["max"]}',
     } for r in result["rubric"]])
-    st.subheader("Student improvement and deduction summary")
+    from student_guidance import repair_cards
+    st.subheader("Student improvement plan")
+    for card in repair_cards(result):
+        with st.expander(card["title"] + " | " + card["where"]):
+            st.write("Why:", card["why"])
+            st.write("Change:", card["change"])
+            st.code(card["example"], language="c")
+            st.write("Test:", card["test"])
+    st.subheader("Marks: deductions and held credit")
     issues = deductions(result)
     if issues:
         st.table([{
